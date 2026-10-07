@@ -23,21 +23,22 @@ INSERT INTO currency_types (code) VALUES ('QC') ON CONFLICT (code) DO NOTHING;
 INSERT INTO status_types (name) VALUES ('SUCCESSFUL'), ('FAILURE'), ('ABORTED'), ('PROCESSING') ON CONFLICT (name) DO NOTHING;
 INSERT INTO acquisition_types (name) VALUES ('peer2peer'), ('qrcode') ON CONFLICT (name) DO NOTHING;
 
--- 3. Create Core Entities
+-- 3. Create Core Entities (Upgraded to UUIDs)
 CREATE TABLE IF NOT EXISTS users (
-                                     id BIGINT PRIMARY KEY,
+                                     id UUID PRIMARY KEY,
                                      name VARCHAR(32) NOT NULL,
                                      contact_number VARCHAR(20) UNIQUE NOT NULL, -- Stored in E.164 format (e.g., +919876543210)
-                                     primary_wallet_id BIGINT,
+                                     primary_wallet_id UUID,
                                      email VARCHAR(20) UNIQUE NOT NULL,
                                      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                                      updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS wallets (
-                                       id BIGINT PRIMARY KEY,
+                                       id UUID PRIMARY KEY,
                                        balance BIGINT NOT NULL DEFAULT 0 CHECK (balance >= 0),
-                                       user_id BIGINT NOT NULL REFERENCES users(id),
+                                       user_id UUID NOT NULL REFERENCES users(id),
+                                       version INT NOT NULL DEFAULT 0, -- Added for Optimistic Locking
                                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                                        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -56,10 +57,10 @@ DO $$
 
 -- Notice: No updated_at. This is a strict append-only log.
 CREATE TABLE IF NOT EXISTS transactions (
-                                            id BIGINT PRIMARY KEY,
-                                            idempotency_key VARCHAR(255) UNIQUE NOT NULL,
-                                            sender_wallet_id BIGINT NOT NULL REFERENCES wallets(id),
-                                            receiver_wallet_id BIGINT NOT NULL REFERENCES wallets(id),
+                                            id UUID PRIMARY KEY,
+                                            idempotency_key UUID UNIQUE NOT NULL, -- Upgraded to native UUID for B-Tree performance
+                                            sender_wallet_id UUID NOT NULL REFERENCES wallets(id),
+                                            receiver_wallet_id UUID NOT NULL REFERENCES wallets(id),
                                             amount BIGINT NOT NULL CHECK (amount > 0),
                                             currency_id INT NOT NULL REFERENCES currency_types(id),
                                             acquisition_id INT NOT NULL REFERENCES acquisition_types(id),
@@ -81,9 +82,9 @@ CREATE TABLE IF NOT EXISTS entry_types (
 INSERT INTO entry_types (name) VALUES ('DEBIT'), ('CREDIT') ON CONFLICT (name) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS ledger_entries (
-                                              id BIGINT PRIMARY KEY,
-                                              transaction_id BIGINT NOT NULL REFERENCES transactions(id),
-                                              wallet_id BIGINT NOT NULL REFERENCES wallets(id),
+                                              id UUID PRIMARY KEY,
+                                              transaction_id UUID NOT NULL REFERENCES transactions(id),
+                                              wallet_id UUID NOT NULL REFERENCES wallets(id),
                                               entry_type_id INT NOT NULL REFERENCES entry_types(id),
                                               amount BIGINT NOT NULL CHECK (amount > 0),
                                               created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
