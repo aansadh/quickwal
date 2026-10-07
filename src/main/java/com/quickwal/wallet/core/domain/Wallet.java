@@ -2,13 +2,15 @@ package com.quickwal.wallet.core.domain;
 
 import lombok.*;
 
+import java.util.UUID;
+
 @Getter @Setter
 public class Wallet {
-    private final Long id;
-    private final Long userId;
+    private final UUID id;
+    private final UUID userId;
     private long balance;
 
-    public Wallet(Long id, Long userId, long initialBalance) {
+    public Wallet(UUID id, UUID userId, long initialBalance) {
         if (initialBalance < 0) {
             throw new IllegalArgumentException("Initial balance cannot be negative");
         }

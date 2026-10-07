@@ -3,10 +3,10 @@ package com.quickwal.wallet.core.service;
 import com.quickwal.wallet.core.domain.Wallet;
 import com.quickwal.wallet.core.port.in.CreateWallet;
 import com.quickwal.wallet.core.port.in.GetWallet;
-import com.quickwal.wallet.core.port.out.IdGenerator;
 import com.quickwal.wallet.core.port.out.WalletRepository;
+import com.quickwal.common.utils.IdGenerator;
 
-import java.util.Optional;
+import java.util.UUID;
 
 public class WalletService implements CreateWallet, GetWallet {
     private final WalletRepository walletRepository;
@@ -18,15 +18,15 @@ public class WalletService implements CreateWallet, GetWallet {
     }
 
     @Override
-    public Wallet createWallet(Long userId, long openingBalance) {
-        long id = idGenerator.generateId();
+    public Wallet createWallet(UUID userId, long openingBalance) {
+        UUID id = idGenerator.generate();
         Wallet wallet = new Wallet(id, userId, openingBalance);
         walletRepository.save(wallet);
         return wallet;
     }
 
     @Override
-    public Wallet getWallet(Long walletId) throws IllegalArgumentException {
+    public Wallet getWallet(UUID walletId) throws IllegalArgumentException {
         return walletRepository.findById(walletId).orElseThrow(() -> new IllegalArgumentException("Wallet not found"));
     }
 }
