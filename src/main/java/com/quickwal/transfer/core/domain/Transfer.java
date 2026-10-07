@@ -6,19 +6,19 @@ import lombok.Getter;
 import java.util.UUID;
 
 @Getter
-public class Transaction {
+public class Transfer {
     private final UUID id;
-    private final String idempotencyKey;
+    private final UUID idempotencyKey;
     private final UUID senderWalletId;
     private final UUID receiverWalletId;
     private final long amount;
     private final CurrencyType currency;
     private final AcquisitionType acquisition;
 
-    private TransactionStatus status;
+    private TransferStatus status;
     private String msg;
 
-    private Transaction(Builder builder) {
+    private Transfer(Builder builder) {
         this.id = builder.id;
         this.idempotencyKey = builder.idempotencyKey;
         this.senderWalletId = builder.senderWalletId;
@@ -27,16 +27,16 @@ public class Transaction {
         this.currency = builder.currency;
         this.acquisition = builder.acquisition;
 
-        this.status = TransactionStatus.PROCESSING;
+        this.status = TransferStatus.PROCESSING;
         this.msg = "Transfer Initiated";
     }
 
-    public static Builder initiate(String idempotencyKey) {
+    public static Builder initiate(UUID idempotencyKey) {
         return new Builder(idempotencyKey);
     }
 
     public static class Builder {
-        private final String idempotencyKey; // Required
+        private final UUID idempotencyKey; // Required
         private final UUID id;
         private UUID senderWalletId;
         private UUID receiverWalletId;
@@ -44,7 +44,7 @@ public class Transaction {
         private CurrencyType currency;
         private AcquisitionType acquisition;
 
-        public Builder(String idempotencyKey) {
+        public Builder(UUID idempotencyKey) {
             this.idempotencyKey = idempotencyKey;
             this.id = IdGenerator.generate();
         }
@@ -71,31 +71,31 @@ public class Transaction {
             return this;
         }
 
-        public Transaction build() {
+        public Transfer build() {
             if (senderWalletId == null || receiverWalletId == null) {
                 throw new IllegalStateException("Sender and Receiver must be specified");
             }
-            return new Transaction(this);
+            return new Transfer(this);
         }
     }
 
     public void markSuccessful() {
-        if (this.status != TransactionStatus.PROCESSING) {
+        if (this.status != TransferStatus.PROCESSING) {
             throw new IllegalStateException("Only PROCESSING transactions can be marked SUCCESSFUL");
         }
-        this.status = TransactionStatus.SUCCESSFUL;
+        this.status = TransferStatus.SUCCESSFUL;
     }
 
     public void markFailure(String failureMessage) {
-        if (this.status != TransactionStatus.PROCESSING) {
+        if (this.status != TransferStatus.PROCESSING) {
             throw new IllegalStateException("Only PROCESSING transactions can be marked FAILURE");
         }
-        this.status = TransactionStatus.FAILURE;
+        this.status = TransferStatus.FAILURE;
         this.msg = failureMessage;
     }
 
     public void abort(String abortMessage) {
-        this.status = TransactionStatus.ABORTED;
+        this.status = TransferStatus.ABORTED;
         this.msg = abortMessage;
     }
 }
