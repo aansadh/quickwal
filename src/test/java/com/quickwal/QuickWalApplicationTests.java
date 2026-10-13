@@ -1,4 +1,4 @@
-package com.quickwal.quickwal;
+package com.quickwal;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

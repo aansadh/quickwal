@@ -9,13 +9,28 @@ import com.quickwal.ledger.core.port.out.LedgerRepository;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Provides the LedgerService class used by QuickWal.
+ */
 public class LedgerService implements LogTransfer {
 
     private final LedgerRepository ledgerRepository;
 
+    /**
+     * Creates a LedgerService.
+     * @param ledgerRepository input value
+     */
     public LedgerService(LedgerRepository ledgerRepository) {
         this.ledgerRepository = ledgerRepository;
     }
+
+        /**
+     * Logs the debit and credit entries for a transfer.
+     * @param transferId input value
+     * @param senderWalletId input value
+     * @param receiverWalletId input value
+     * @param amount input value
+     */
 
     @Override
     public void log(UUID transferId, UUID senderWalletId, UUID receiverWalletId, long amount) {
