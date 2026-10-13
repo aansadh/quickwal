@@ -1,0 +1,7 @@
+databaseChangeLog:
+  - include:
+      file: migration/_1_init_db.sql
+      relativeToChangelogFile: true
+  - include:
+      file: migration/_2_simplify_transactions_enums.sql
+      relativeToChangelogFile: true
