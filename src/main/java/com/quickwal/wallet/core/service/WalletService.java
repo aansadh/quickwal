@@ -1,42 +1,109 @@
 package com.quickwal.wallet.core.service;
 
-import com.quickwal.wallet.core.domain.Wallet;
-import com.quickwal.wallet.core.port.in.CreateWallet;
-import com.quickwal.wallet.core.port.in.GetWallet;
-import com.quickwal.wallet.core.port.in.WalletUseCase;
-import com.quickwal.wallet.core.port.out.WalletRepository;
+import com.quickwal.common.messages.command.*;
+import com.quickwal.common.messages.event.*;
 import com.quickwal.common.utils.IdGenerator;
+import com.quickwal.wallet.core.port.in.ProcessWalletCommand;
+import com.quickwal.wallet.core.port.out.WalletRepository;
 
-import java.util.List;
-import java.util.UUID;
-
-public class WalletService implements CreateWallet, GetWallet, WalletUseCase {
+/**
+ * Provides the WalletService class used by QuickWal.
+ */
+public class WalletService implements ProcessWalletCommand {
     private final WalletRepository walletRepository;
 
+    /**
+     * Creates a WalletService.
+     * @param walletRepository input value
+     */
     public WalletService(WalletRepository walletRepository) {
         this.walletRepository = walletRepository;
     }
 
-    @Override
-    public Wallet createWallet(UUID userId, long openingBalance) {
-        UUID id = IdGenerator.generate();
-        Wallet wallet = new Wallet(id, userId, openingBalance);
-        walletRepository.save(wallet);
-        return wallet;
-    }
+        /**
+     * Processes a debit command.
+     * @param command input value
+     */
 
     @Override
-    public Wallet getWallet(UUID walletId) throws IllegalArgumentException {
-        return walletRepository.findById(walletId).orElseThrow(() -> new IllegalArgumentException("Wallet not found"));
+    public void debit(DebitCommand command) {
+        try {
+            DebitCompletedEvent successEvent = new DebitCompletedEvent(
+                    IdGenerator.generate(),
+                    command.transferId(),
+                    command.sourceWalletId()
+            );
+
+            walletRepository.deductAndSaveOutboxEvent(
+                    command.sourceWalletId(),
+                    command.amount(),
+                    command.eventId(),
+                    successEvent
+            );
+        } catch (Exception e) {
+            DebitFailedEvent failureEvent = new DebitFailedEvent(
+                    IdGenerator.generate(),
+                    command.transferId(),
+                    command.sourceWalletId(),
+                    e.getMessage()
+            );
+            walletRepository.saveFailureOutboxEvent(command.sourceWalletId(), failureEvent);
+        }
     }
 
-    @Override
-    public List<Wallet> lockAndGet(UUID senderId, UUID receiverId) {
-        return walletRepository.getWalletsForUpdate(senderId, receiverId);
-    }
+        /**
+     * Processes a credit command.
+     * @param command input value
+     */
 
     @Override
-    public void update(Wallet wallet) {
-        walletRepository.update(wallet);
+    public void credit(CreditCommand command) {
+        try {
+            CreditCompletedEvent successEvent = new CreditCompletedEvent(
+                    IdGenerator.generate(),
+                    command.transferId(),
+                    command.targetWalletId()
+            );
+
+            walletRepository.addAndSaveOutboxEvent(
+                    command.targetWalletId(),
+                    command.amount(),
+                    command.eventId(),
+                    successEvent
+            );
+        } catch (Exception e) {
+            CreditFailedEvent failureEvent = new CreditFailedEvent(
+                    IdGenerator.generate(),
+                    command.transferId(),
+                    command.targetWalletId(),
+                    e.getMessage()
+            );
+            walletRepository.saveFailureOutboxEvent(command.targetWalletId(), failureEvent);
+        }
+    }
+
+        /**
+     * Processes a refund command.
+     * @param command input value
+     */
+
+    @Override
+    public void refund(RefundCommand command) {
+        try {
+            RefundCompletedEvent successEvent = new RefundCompletedEvent(
+                    IdGenerator.generate(),
+                    command.transferId(),
+                    command.sourceWalletId()
+            );
+
+            walletRepository.refundAndSaveOutboxEvent(
+                    command.sourceWalletId(),
+                    command.amount(),
+                    command.eventId(),
+                    successEvent
+            );
+        } catch (Exception e) {
+            throw new RuntimeException("CRITICAL: Failed to process refund for transfer " + command.transferId(), e);
+        }
     }
 }
