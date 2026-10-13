@@ -1,6 +1,6 @@
 -- liquibase formatted sql
 
--- changeset quickwal:1
+-- changeset quickwal:1 splitStatements:false
 
 -- 1. Create Lookup Tables (The Enums)
 CREATE TABLE IF NOT EXISTS currency_types (
@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS currency_types (
 
 CREATE TABLE IF NOT EXISTS status_types (
                                             id SERIAL PRIMARY KEY,
-                                            name VARCHAR(20) UNIQUE NOT NULL
+                                            name VARCHAR(50) UNIQUE NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS acquisition_types (
@@ -19,9 +19,22 @@ CREATE TABLE IF NOT EXISTS acquisition_types (
 );
 
 -- 2. Insert Seed Data (Using ON CONFLICT to ensure idempotency)
+-- FIXED: Added Saga states to match Java TransferStatus Enum
 INSERT INTO currency_types (code) VALUES ('QC') ON CONFLICT (code) DO NOTHING;
-INSERT INTO status_types (name) VALUES ('SUCCESSFUL'), ('FAILURE'), ('ABORTED'), ('PROCESSING') ON CONFLICT (name) DO NOTHING;
-INSERT INTO acquisition_types (name) VALUES ('peer2peer'), ('qrcode') ON CONFLICT (name) DO NOTHING;
+INSERT INTO status_types (name) VALUES
+                                    ('SUCCESSFUL'),
+                                    ('FAILURE'),
+                                    ('ABORTED'),
+                                    ('PROCESSING'),
+                                    ('SENDER_DEBITED'),
+                                    ('REFUNDING')
+ON CONFLICT (name) DO NOTHING;
+
+-- FIXED: Uppercased to match Java AcquisitionType Enum exactly
+INSERT INTO acquisition_types (name) VALUES
+                                         ('PEER2PEER'),
+                                         ('QRCODE')
+ON CONFLICT (name) DO NOTHING;
 
 -- 3. Create Core Entities (Upgraded to UUIDs)
 CREATE TABLE IF NOT EXISTS users (
@@ -58,12 +71,12 @@ DO $$
 -- Notice: No updated_at. This is a strict append-only log.
 CREATE TABLE IF NOT EXISTS transactions (
                                             id UUID PRIMARY KEY,
-                                            idempotency_key UUID UNIQUE NOT NULL, -- Upgraded to native UUID for B-Tree performance
+                                            idempotency_key UUID UNIQUE NOT NULL,
                                             sender_wallet_id UUID NOT NULL REFERENCES wallets(id),
                                             receiver_wallet_id UUID NOT NULL REFERENCES wallets(id),
                                             amount BIGINT NOT NULL CHECK (amount > 0),
-                                            currency_id INT NOT NULL REFERENCES currency_types(id),
-                                            acquisition_id INT NOT NULL REFERENCES acquisition_types(id),
+                                            currency_id INT REFERENCES currency_types(id),
+                                            acquisition_id INT REFERENCES acquisition_types(id),
                                             status_id INT NOT NULL REFERENCES status_types(id),
                                             msg VARCHAR(255),
                                             created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -92,3 +105,24 @@ CREATE TABLE IF NOT EXISTS ledger_entries (
 
 CREATE INDEX IF NOT EXISTS idx_ledger_transaction ON ledger_entries(transaction_id);
 CREATE INDEX IF NOT EXISTS idx_ledger_wallet ON ledger_entries(wallet_id);
+
+-- -----------------------------------------------------------------------------
+-- 6. OUTBOX & INBOX: Distributed Messaging Tables
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS outbox_events (
+                                             id UUID PRIMARY KEY,
+                                             aggregate_type VARCHAR(100) NOT NULL, -- e.g., 'TRANSFER' or 'WALLET'
+                                             aggregate_id UUID NOT NULL,           -- The ID of the Transfer or Wallet
+                                             event_type VARCHAR(100) NOT NULL,     -- e.g., 'DebitCommand'
+                                             payload JSONB NOT NULL,               -- The actual event payload serialized as JSON
+                                             created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Index to optimize the Outbox Poller (which constantly scans for oldest events)
+CREATE INDEX IF NOT EXISTS idx_outbox_events_created_at ON outbox_events(created_at);
+
+CREATE TABLE IF NOT EXISTS inbox_events (
+                                            event_id UUID PRIMARY KEY,            -- The unique ID of the consumed Kafka event
+                                            consumer_name VARCHAR(100) NOT NULL,  -- e.g., 'wallet-command-consumer'
+                                            processed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
