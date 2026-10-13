@@ -1,78 +1,127 @@
 package com.quickwal.transfer.core.service;
 
-import com.quickwal.ledger.core.port.in.LogTransfer;
-import com.quickwal.transfer.core.domain.AcquisitionType;
-import com.quickwal.transfer.core.domain.CurrencyType;
-import com.quickwal.transfer.core.domain.Transfer;
-import com.quickwal.transfer.core.port.in.ExecuteTransfer;
+import com.quickwal.common.messages.command.CreditCommand;
+import com.quickwal.common.messages.command.DebitCommand;
+import com.quickwal.common.messages.command.RefundCommand;
+import com.quickwal.common.utils.IdGenerator;
+import com.quickwal.transfer.core.domain.*;
+import com.quickwal.transfer.core.domain.exception.TransferNotFoundException;
+import com.quickwal.transfer.core.port.in.AdvanceTransferSaga;
+import com.quickwal.transfer.core.port.in.InitiateTransfer;
 import com.quickwal.transfer.core.port.out.TransferRepository;
-import com.quickwal.wallet.core.domain.Wallet;
-import com.quickwal.wallet.core.port.in.WalletUseCase;
 
-import java.util.List;
 import java.util.UUID;
 
-public class TransferService implements ExecuteTransfer {
-
-    private final WalletUseCase walletUseCase;
-    private final LogTransfer logTransferUseCase;
+/**
+ * Provides the TransferService class used by QuickWal.
+ */
+public class TransferService implements InitiateTransfer, AdvanceTransferSaga {
     private final TransferRepository transferRepository;
 
-    public TransferService(WalletUseCase walletUseCase,
-                           LogTransfer logTransferUseCase,
-                           TransferRepository transferRepository) {
-        this.walletUseCase = walletUseCase;
-        this.logTransferUseCase = logTransferUseCase;
+    /**
+     * Creates a TransferService.
+     * @param transferRepository input value
+     */
+    public TransferService(TransferRepository transferRepository) {
         this.transferRepository = transferRepository;
     }
 
-    @Override
-    public Transfer execute(UUID idempotencyKey, UUID senderId, UUID receiverId,
-                            long amount, CurrencyType currency, AcquisitionType acquisition) {
+        /**
+     * Initiates a transfer.
+     * @param sourceWalletId input value
+     * @param targetWalletId input value
+     * @param amount input value
+     * @param idempotencyKey input value
+     * @return the operation result
+     */
 
-        Transfer transfer = Transfer.initiate(idempotencyKey)
-                .fromSender(senderId)
-                .toReceiver(receiverId)
-                .withAmount(amount, currency)
-                .viaAcquisition(acquisition)
+    @Override
+    public UUID execute(UUID sourceWalletId, UUID targetWalletId, long amount, String idempotencyKey) {
+        UUID idempotencyId = UUID.fromString(idempotencyKey);
+        Transfer transfer = Transfer.initiate(idempotencyId)
+                .fromSender(sourceWalletId)
+                .toReceiver(targetWalletId)
+                .withAmount(amount, CurrencyType.QC)
+                .viaAcquisition(AcquisitionType.PEER2PEER)
                 .build();
 
-        Transfer idempotentSaveResult = transferRepository.saveIdempotently(transfer);
-        if(!transfer.getId().equals(idempotentSaveResult.getId())) {
-            return idempotentSaveResult;
-        }
+        DebitCommand command = new DebitCommand(IdGenerator.generate(), transfer.getId(), sourceWalletId, amount);
+        return transferRepository.insertTransferAndOutboxEvent(transfer, command).getId();
+    }
 
-        // Database-level Lock Acquisition
-        // The underlying adapter MUST implement: SELECT * FROM wallets WHERE id IN (?, ?) ORDER BY id FOR UPDATE
-        List<Wallet> wallets;
-        try {
-            wallets = walletUseCase.lockAndGet(senderId, receiverId);
-        } catch (IllegalArgumentException e) {
-            transfer.markFailure("Wallet lookup failed: " + e.getMessage());
-            transferRepository.update(transfer);
-            return transfer;
-        }
+        /**
+     * Advances a transfer after a successful debit.
+     * @param transferId input value
+     */
 
-        Wallet sender = wallets.get(0).getId().equals(senderId) ? wallets.get(0) : wallets.get(1);
-        Wallet receiver = wallets.get(0).getId().equals(receiverId) ? wallets.get(0) : wallets.get(1);
+    @Override
+    public void handleDebitCompleted(UUID transferId) {
+        Transfer transfer = getTransfer(transferId);
+        TransferStatus prevStatus = transfer.getStatus();
+        transfer.markSenderDebited();
 
-        try {
-            sender.debit(amount);
-            receiver.credit(amount);
+        CreditCommand command = new CreditCommand(IdGenerator.generate(), transfer.getId(), transfer.getReceiverWalletId(), transfer.getAmount());
+        transferRepository.updateTransferAndOutboxEvent(transfer, prevStatus, command);
+    }
 
-            walletUseCase.update(sender);
-            walletUseCase.update(receiver);
+        /**
+     * Records a failed debit for a transfer.
+     * @param transferId input value
+     * @param reason input value
+     */
 
-            logTransferUseCase.log(transfer.getId(), senderId, receiverId, amount);
+    @Override
+    public void handleDebitFailed(UUID transferId, String reason) {
+        Transfer transfer = getTransfer(transferId);
+        TransferStatus prevStatus = transfer.getStatus();
+        transfer.markFailure(reason);
+        transferRepository.updateTransferAndOutboxEvent(transfer, prevStatus, null);
+    }
 
-            transfer.markSuccessful();
-        } catch (Exception e) {
-            transfer.markFailure(e.getMessage());
-            throw e; // Rethrow to trigger Spring's @Transactional DB rollback, releasing DB locks
-        } finally {
-            transferRepository.update(transfer);
-        }
+        /**
+     * Advances a transfer after a successful credit.
+     * @param transferId input value
+     */
 
-        return transfer;
+    @Override
+    public void handleCreditCompleted(UUID transferId) {
+        Transfer transfer = getTransfer(transferId);
+        TransferStatus prevStatus = transfer.getStatus();
+        transfer.markSuccessful();
+        transferRepository.updateTransferAndOutboxEvent(transfer, prevStatus, null);
+    }
+
+        /**
+     * Starts refund processing after a failed credit.
+     * @param transferId input value
+     * @param reason input value
+     */
+
+    @Override
+    public void handleCreditFailed(UUID transferId, String reason) {
+        Transfer transfer = getTransfer(transferId);
+        TransferStatus prevStatus = transfer.getStatus();
+        transfer.markRefunding(reason);
+
+        RefundCommand command = new RefundCommand(IdGenerator.generate(), transfer.getId(), transfer.getSenderWalletId(), transfer.getAmount());
+        transferRepository.updateTransferAndOutboxEvent(transfer, prevStatus, command);
+    }
+
+        /**
+     * Completes handling of a refunded transfer.
+     * @param transferId input value
+     */
+
+    @Override
+    public void handleRefundCompleted(UUID transferId) {
+        Transfer transfer = getTransfer(transferId);
+        TransferStatus prevStatus = transfer.getStatus();
+        transfer.markFailure("Credit failed and debit was refunded");
+        transferRepository.updateTransferAndOutboxEvent(transfer, prevStatus, null);
+    }
+
+    private Transfer getTransfer(UUID transferId) {
+        return transferRepository.findById(transferId)
+                .orElseThrow(() -> new TransferNotFoundException("Transfer not found: " + transferId));
     }
 }
