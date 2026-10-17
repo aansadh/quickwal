@@ -1,12 +1,12 @@
 package com.quickwal.transfer.core.domain;
 
+import com.quickwal.common.money.CurrencyType;
+import com.quickwal.common.money.Money;
 import com.quickwal.common.utils.IdGenerator;
 import lombok.Getter;
-import java.util.UUID;
 
-/**
- * Provides the Transfer class used by QuickWal.
- */
+import java.util.Objects;
+import java.util.UUID;
 
 @Getter
 public class Transfer {
@@ -14,201 +14,139 @@ public class Transfer {
     private final UUID idempotencyKey;
     private final UUID senderWalletId;
     private final UUID receiverWalletId;
-    private final long amount;
-    private final CurrencyType currency;
+    private final Money amount;
     private final AcquisitionType acquisition;
-
     private TransferStatus status;
     private String msg;
 
     private Transfer(Builder builder) {
-        this.id = builder.id;
-        this.idempotencyKey = builder.idempotencyKey;
-        this.senderWalletId = builder.senderWalletId;
-        this.receiverWalletId = builder.receiverWalletId;
-        this.amount = builder.amount;
-        this.currency = builder.currency;
-        this.acquisition = builder.acquisition;
-
-        this.status = TransferStatus.PROCESSING;
-        this.msg = "Transfer Initiated";
+        id = builder.id;
+        idempotencyKey = builder.idempotencyKey;
+        senderWalletId = builder.senderWalletId;
+        receiverWalletId = builder.receiverWalletId;
+        amount = builder.amount;
+        acquisition = builder.acquisition;
+        status = TransferStatus.PROCESSING;
+        msg = "Transfer Initiated";
     }
 
-    private Transfer(UUID id, UUID idempotencyKey, UUID senderWalletId, UUID receiverWalletId, long amount, CurrencyType currency, AcquisitionType acquisition, TransferStatus status, String msg) {
+    private Transfer(UUID id, UUID idempotencyKey, UUID senderWalletId, UUID receiverWalletId,
+                     Money amount, AcquisitionType acquisition, TransferStatus status, String msg) {
         this.id = id;
         this.idempotencyKey = idempotencyKey;
         this.senderWalletId = senderWalletId;
         this.receiverWalletId = receiverWalletId;
         this.amount = amount;
-        this.currency = currency;
         this.acquisition = acquisition;
         this.status = status;
         this.msg = msg;
     }
 
-    /**
-     * Reconstructs a transfer from persisted state.
-     * @param id input value
-     * @param idempotencyKey input value
-     * @param senderWalletId input value
-     * @param receiverWalletId input value
-     * @param amount input value
-     * @param currency input value
-     * @param acquisition input value
-     * @param status input value
-     * @param msg input value
-     * @return the operation result
-     */
-    public static Transfer hydrate(UUID id, UUID idempotencyKey, UUID senderWalletId, UUID receiverWalletId, long amount, CurrencyType currency, AcquisitionType acquisition, TransferStatus status, String msg) {
-
-        return new Transfer(id, idempotencyKey, senderWalletId, receiverWalletId, amount, currency, acquisition, status, msg);
+    public static Transfer hydrate(UUID id, UUID idempotencyKey, UUID senderWalletId, UUID receiverWalletId,
+                                   Money amount, AcquisitionType acquisition, TransferStatus status, String msg) {
+        return new Transfer(id, idempotencyKey, senderWalletId, receiverWalletId, amount, acquisition, status, msg);
     }
 
-    /**
-     * Starts building a new transfer.
-     * @param idempotencyKey input value
-     * @return the operation result
-     */
-    public static Builder initiate(UUID idempotencyKey) {
-
-        return new Builder(idempotencyKey);
-    }
+    public static Builder initiate(UUID idempotencyKey) { return new Builder(idempotencyKey); }
 
     public static class Builder {
         private final UUID idempotencyKey;
-        private final UUID id;
+        private final UUID id = IdGenerator.generate();
         private UUID senderWalletId;
         private UUID receiverWalletId;
-        private long amount;
-        private CurrencyType currency;
+        private Money amount;
         private AcquisitionType acquisition;
 
-        /**
-         * Performs the Builder operation.
-         * @param idempotencyKey input value
-         */
         public Builder(UUID idempotencyKey) {
-            this.idempotencyKey = idempotencyKey;
-            this.id = IdGenerator.generate();
+            this.idempotencyKey = Objects.requireNonNull(idempotencyKey, "idempotencyKey");
         }
-
-        /**
-         * Sets the sender wallet.
-         * @param senderWalletId input value
-         * @return the operation result
-         */
-        public Builder fromSender(UUID senderWalletId) {
-            this.senderWalletId = senderWalletId;
+        public Builder fromSender(UUID senderWalletId) { this.senderWalletId = senderWalletId; return this; }
+        public Builder toReceiver(UUID receiverWalletId) { this.receiverWalletId = receiverWalletId; return this; }
+        public Builder withAmount(Money amount) {
+            this.amount = Objects.requireNonNull(amount, "amount");
+            amount.requirePositive();
             return this;
         }
-
-        /**
-         * Sets the receiver wallet.
-         * @param receiverWalletId input value
-         * @return the operation result
-         */
-        public Builder toReceiver(UUID receiverWalletId) {
-            this.receiverWalletId = receiverWalletId;
-            return this;
-        }
-
-        /**
-         * Sets the transfer amount and currency.
-         * @param amount input value
-         * @param currency input value
-         * @return the operation result
-         */
-        public Builder withAmount(long amount, CurrencyType currency) {
-            if (amount <= 0) throw new IllegalArgumentException("Amount must be positive");
-            this.amount = amount;
-            this.currency = currency;
-            return this;
-        }
-
-        /**
-         * Sets the transfer acquisition type.
-         * @param acquisition input value
-         * @return the operation result
-         */
         public Builder viaAcquisition(AcquisitionType acquisition) {
-            this.acquisition = acquisition;
+            this.acquisition = Objects.requireNonNull(acquisition, "acquisition");
             return this;
         }
-
-        /**
-         * Builds the transfer.
-         * @return the operation result
-         */
         public Transfer build() {
-            if (senderWalletId == null || receiverWalletId == null) {
-
-                throw new IllegalStateException("Sender and Receiver must be specified");
+            if (senderWalletId == null || receiverWalletId == null) throw new IllegalStateException("Sender and receiver wallets must be specified");
+            if (amount == null) throw new IllegalStateException("Amount must be specified");
+            if (senderWalletId.equals(receiverWalletId)) {
+                throw new IllegalArgumentException("Sender and receiver wallets must differ");
             }
-
+            if (acquisition == null) throw new IllegalStateException("Acquisition type must be specified");
             return new Transfer(this);
         }
     }
 
-    /**
-     * Marks the sender debit as completed.
-     */
+    public void validateSourceEvent(UUID walletId, CurrencyType currency) {
+        validateEvent(walletId, currency, senderWalletId);
+    }
+
+    public void validateTargetEvent(UUID walletId, CurrencyType currency) {
+        validateEvent(walletId, currency, receiverWalletId);
+    }
+
+    private void validateEvent(UUID walletId, CurrencyType currency, UUID expectedWalletId) {
+        Objects.requireNonNull(walletId, "event walletId");
+        Objects.requireNonNull(currency, "event currency");
+        if (!expectedWalletId.equals(walletId)) throw new IllegalArgumentException("Event wallet does not match transfer wallet");
+        if (amount.currency() != currency) throw new IllegalArgumentException("Event currency does not match transfer currency");
+    }
+
     public void markSenderDebited() {
-        if (this.status != TransferStatus.PROCESSING) {
-
-            throw new IllegalStateException("Invalid transition: Transfer is not PROCESSING");
-        }
-        this.status = TransferStatus.SENDER_DEBITED;
-        this.msg = "Sender debited, awaiting receiver credit";
+        requireStatus(TransferStatus.PROCESSING, "debit completion");
+        status = TransferStatus.SENDER_DEBITED;
+        msg = "Sender debited, awaiting receiver credit";
     }
 
-    /**
-     * Marks the transfer as being refunded.
-     * @param reason input value
-     */
+    public void markDebitFailed(String reason) {
+        requireStatus(TransferStatus.PROCESSING, "debit failure");
+        markFailure(reason);
+    }
+
     public void markRefunding(String reason) {
-        if (this.status != TransferStatus.SENDER_DEBITED) {
-
-            throw new IllegalStateException("Invalid transition: Cannot refund unless SENDER_DEBITED");
-        }
-        this.status = TransferStatus.REFUNDING;
-        this.msg = "Refunding: " + reason;
+        requireStatus(TransferStatus.SENDER_DEBITED, "refund");
+        requireReason(reason);
+        status = TransferStatus.REFUNDING;
+        msg = "Refunding: " + reason;
     }
 
-    /**
-     * Marks the transfer as successful.
-     */
     public void markSuccessful() {
-        if (this.status != TransferStatus.SENDER_DEBITED) {
-
-            throw new IllegalStateException("Invalid transition: Cannot complete unless SENDER_DEBITED");
-        }
-        this.status = TransferStatus.SUCCESSFUL;
-        this.msg = "Transfer Completed Successfully";
+        requireStatus(TransferStatus.SENDER_DEBITED, "completion");
+        status = TransferStatus.SUCCESSFUL;
+        msg = "Transfer Completed Successfully";
     }
 
-    /**
-     * Marks the transfer as failed.
-     * @param failureMessage input value
-     */
-    public void markFailure(String failureMessage) {
-        if (this.status == TransferStatus.SUCCESSFUL) {
-
-            throw new IllegalStateException("Invalid transition: Cannot fail a SUCCESSFUL transfer");
-        }
-        this.status = TransferStatus.FAILURE;
-        this.msg = failureMessage;
+    public void markRefundCompleted() {
+        requireStatus(TransferStatus.REFUNDING, "refund completion");
+        markFailure("Credit failed and debit was refunded");
     }
 
-    /**
-     * Aborts the transfer.
-     * @param abortMessage input value
-     */
+    private void markFailure(String reason) {
+        requireReason(reason);
+        status = TransferStatus.FAILURE;
+        msg = reason;
+    }
+
+    private void requireStatus(TransferStatus expected, String operation) {
+        if (status != expected) throw new IllegalStateException("Invalid transition: " + operation + " requires " + expected);
+    }
+
+    private void requireReason(String reason) {
+        if (reason == null || reason.isBlank()) throw new IllegalArgumentException("Failure reason is required");
+    }
+
     public void abort(String abortMessage) {
-        if (this.status == TransferStatus.SUCCESSFUL) {
-
-            throw new IllegalStateException("Invalid transition: Cannot abort a SUCCESSFUL transfer");
-        }
-        this.status = TransferStatus.ABORTED;
-        this.msg = abortMessage;
+        if (status == TransferStatus.SUCCESSFUL) throw new IllegalStateException("Invalid transition: Cannot abort a SUCCESSFUL transfer");
+        status = TransferStatus.ABORTED;
+        msg = abortMessage;
     }
 }
+
+
+
+
