@@ -1,5 +1,6 @@
 package com.quickwal.transfer.core.port.in;
 
+import com.quickwal.common.money.Money;
 import java.util.UUID;
 
 /**
@@ -8,7 +9,7 @@ import java.util.UUID;
 public interface InitiateTransfer {
     /**
      * Creates a transfer in its initial state and emits the debit command
-     * through the transfer repository's outbox operation.
+     * with its debit command through the transactional outbox.
      *
      * @param sourceWalletId wallet from which funds will be debited
      * @param targetWalletId wallet to which funds will be credited
@@ -19,5 +20,6 @@ public interface InitiateTransfer {
      * @throws IllegalArgumentException if the idempotency key is not a UUID or
      * the transfer amount is not positive
      */
-    UUID execute(UUID sourceWalletId, UUID targetWalletId, long amount, String idempotencyKey);
+    UUID execute(UUID sourceWalletId, UUID targetWalletId, Money amount, String idempotencyKey);
 }
+

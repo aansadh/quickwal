@@ -1,6 +1,7 @@
 package com.quickwal.wallet.core.port.in;
 
 import com.quickwal.wallet.core.domain.Wallet;
+import com.quickwal.common.money.Money;
 
 import java.util.UUID;
 
@@ -14,5 +15,5 @@ public interface CreateWallet {
      * @param openingBalance input value
      * @return the operation result
      */
-    Wallet createWallet(UUID userId, long openingBalance);
+    Wallet createWallet(UUID userId, Money openingBalance);
 }

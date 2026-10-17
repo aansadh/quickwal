@@ -1,39 +1,33 @@
 package com.quickwal.common.events;
 
-/**
- * Defines the AggregateType enum used by QuickWal.
- */
 public enum AggregateType {
     TRANSFER("TRANSFER"),
-
     WALLET("WALLET");
 
-    private final String code;
+    private final String value;
 
-    AggregateType(String code) {
-        this.code = code;
+    AggregateType(String value) {
+        this.value = value;
     }
 
-    /**
-     * Returns the external code.
-     * @return the operation result
-     */
     public String code() {
-        return this.code;
+        return value;
     }
 
-    /**
-     * Resolves a value from its external code.
-     * @param code input value
-     * @return the operation result
-     */
     public static AggregateType fromCode(String code) {
+        if (code == null || code.isBlank()) {
+            throw new IllegalArgumentException("Aggregate type code must not be null or blank");
+        }
         for (AggregateType aggregateType : values()) {
-            if (aggregateType.code.equals(code)) {
+            if (aggregateType.value.equals(code)) {
                 return aggregateType;
             }
         }
-
         throw new IllegalArgumentException("Unknown AggregateType code: " + code);
+    }
+
+    @Override
+    public String toString() {
+        return code();
     }
 }
