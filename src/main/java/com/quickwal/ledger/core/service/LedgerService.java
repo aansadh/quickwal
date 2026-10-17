@@ -1,6 +1,5 @@
 package com.quickwal.ledger.core.service;
 
-import com.quickwal.common.utils.IdGenerator;
 import com.quickwal.ledger.core.domain.EntryType;
 import com.quickwal.ledger.core.domain.LedgerEntry;
 import com.quickwal.ledger.core.port.in.LogTransfer;
@@ -8,6 +7,7 @@ import com.quickwal.ledger.core.port.out.LedgerRepository;
 
 import java.util.List;
 import java.util.UUID;
+import com.quickwal.common.money.Money;
 
 /**
  * Provides the LedgerService class used by QuickWal.
@@ -21,7 +21,8 @@ public class LedgerService implements LogTransfer {
      * @param ledgerRepository input value
      */
     public LedgerService(LedgerRepository ledgerRepository) {
-        this.ledgerRepository = ledgerRepository;
+        this.ledgerRepository = java.util.Objects.requireNonNull(
+                ledgerRepository, "ledgerRepository");
     }
 
         /**
@@ -33,9 +34,9 @@ public class LedgerService implements LogTransfer {
      */
 
     @Override
-    public void log(UUID transferId, UUID senderWalletId, UUID receiverWalletId, long amount) {
+    public void log(UUID transferId, UUID senderWalletId, UUID receiverWalletId, Money amount) {
         LedgerEntry debit = new LedgerEntry(
-                IdGenerator.generate(),
+                logicalEntryId(transferId, senderWalletId, EntryType.DEBIT),
                 transferId,
                 senderWalletId,
                 EntryType.DEBIT,
@@ -43,7 +44,7 @@ public class LedgerService implements LogTransfer {
         );
 
         LedgerEntry credit = new LedgerEntry(
-                IdGenerator.generate(),
+                logicalEntryId(transferId, receiverWalletId, EntryType.CREDIT),
                 transferId,
                 receiverWalletId,
                 EntryType.CREDIT,
@@ -51,5 +52,11 @@ public class LedgerService implements LogTransfer {
         );
 
         ledgerRepository.saveAll(List.of(debit, credit));
+    }
+
+    private UUID logicalEntryId(UUID transferId, UUID walletId, EntryType entryType) {
+        return UUID.nameUUIDFromBytes(
+                (transferId + ":" + walletId + ":" + entryType.name())
+                        .getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 }

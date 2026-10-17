@@ -1,6 +1,7 @@
 package com.quickwal.ledger.core.port.in;
 
 import java.util.UUID;
+import com.quickwal.common.money.Money;
 
 /**
  * Defines the LogTransfer interface used by QuickWal.
@@ -13,5 +14,5 @@ public interface LogTransfer {
      * @param receiverWalletId input value
      * @param amount input value
      */
-    void log(UUID transferId, UUID senderWalletId, UUID receiverWalletId, long amount);
+    void log(UUID transferId, UUID senderWalletId, UUID receiverWalletId, Money amount);
 }
