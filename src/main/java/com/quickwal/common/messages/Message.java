@@ -1,7 +1,7 @@
 package com.quickwal.common.messages;
 
 import java.util.UUID;
-
+import java.lang.String;
 /**
  * Common contract for messages serialized into the transactional outbox.
  *

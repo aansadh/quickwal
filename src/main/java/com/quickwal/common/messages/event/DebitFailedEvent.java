@@ -1,13 +1,16 @@
 package com.quickwal.common.messages.event;
 import com.quickwal.common.messages.Event;
+import com.quickwal.common.messages.MessageType;
 import java.util.UUID;
+import com.quickwal.common.money.CurrencyType;
 /**
  * Represents the DebitFailedEvent record used by QuickWal.
  */
-public record DebitFailedEvent(UUID eventId, UUID transferId, UUID sourceWalletId, String reason) implements Event {
+public record DebitFailedEvent(UUID eventId, UUID transferId, UUID sourceWalletId, String reason, CurrencyType currency) implements Event {
     /**
      * Returns the discriminator used for message routing.
+     *
      * @return the message type
      */
-    @Override public String getEventType() { return "DebitFailedEvent"; }
+    @Override public java.lang.String getEventType() { return MessageType.DEBIT_FAILED_EVENT.wireName(); }
 }

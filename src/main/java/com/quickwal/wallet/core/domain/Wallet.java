@@ -1,17 +1,18 @@
 package com.quickwal.wallet.core.domain;
 
-import lombok.*;
+import lombok.Getter;
 
 import java.util.UUID;
+import com.quickwal.common.money.Money;
 
-@Getter @Setter
+@Getter
 /**
  * Provides the Wallet class used by QuickWal.
  */
 public class Wallet {
     private final UUID id;
     private final UUID userId;
-    private long balance;
+    private Money balance;
 
     /**
      * Creates a Wallet.
@@ -19,9 +20,9 @@ public class Wallet {
      * @param userId input value
      * @param initialBalance input value
      */
-    public Wallet(UUID id, UUID userId, long initialBalance) {
-        if (initialBalance < 0) {
-
+    public Wallet(UUID id, UUID userId, Money initialBalance) {
+        initialBalance = java.util.Objects.requireNonNull(initialBalance, "initialBalance");
+        if (initialBalance.isNegative()) {
             throw new IllegalArgumentException("Initial balance cannot be negative");
         }
         this.id = id;
@@ -33,18 +34,25 @@ public class Wallet {
      * Processes a debit command.
      * @param amount input value
      */
-    public void debit(long amount) {
-        if (amount <= 0) throw new IllegalArgumentException("Amount must be positive");
-        if (this.balance < amount) throw new IllegalStateException("Insufficient funds");
-        this.balance -= amount;
+    public void debit(Money amount) {
+        amount.requirePositive();
+        requireCurrency(amount);
+        if (this.balance.amountMinor() < amount.amountMinor()) throw new IllegalStateException("Insufficient funds");
+        this.balance = balance.subtract(amount);
     }
 
     /**
      * Processes a credit command.
      * @param amount input value
      */
-    public void credit(long amount) {
-        if (amount <= 0) throw new IllegalArgumentException("Amount must be positive");
-        this.balance += amount;
+    public void credit(Money amount) {
+        amount.requirePositive();
+        requireCurrency(amount);
+        this.balance = balance.add(amount);
+    }
+
+    public Money getBalance() { return balance; }
+    private void requireCurrency(Money amount) {
+        if (balance.currency() != amount.currency()) throw new IllegalArgumentException("Currency mismatch");
     }
 }
