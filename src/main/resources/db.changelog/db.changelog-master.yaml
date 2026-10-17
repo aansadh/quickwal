@@ -5,3 +5,18 @@ databaseChangeLog:
   - include:
       file: migration/_2_simplify_transactions_enums.sql
       relativeToChangelogFile: true
+  - include:
+      file: migration/_3_inbox_consumer_key.sql
+      relativeToChangelogFile: true
+  - include:
+      file: migration/_4_currency_wallets.sql
+      relativeToChangelogFile: true
+  - include:
+      file: migration/_5_currency_ledger_backfill.sql
+      relativeToChangelogFile: true
+  - include:
+      file: migration/_6_minor_unit_column_names.sql
+      relativeToChangelogFile: true
+  - include:
+      file: migration/_7_remove_synthetic_ledger_backfill.sql
+      relativeToChangelogFile: true
