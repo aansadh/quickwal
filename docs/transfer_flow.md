@@ -1,4 +1,5 @@
-flowchart TD
+```mermaid
+    flowchart TD
     CLIENT["Client"]
 
     subgraph HTTP["HTTP driving adapter"]
@@ -145,3 +146,4 @@ flowchart TD
     RUNNER -. "same transaction as transfer insert" .-> OUTBOX_TABLE
     WS -. "wallet mutation + inbox + outbox are transactional" .-> WALLET_TABLE
     HANDLERS -. "inbox + state update + any next command are transactional" .-> INBOX_TABLE
+```
