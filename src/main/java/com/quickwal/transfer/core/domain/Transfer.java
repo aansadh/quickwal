@@ -108,7 +108,7 @@ public class Transfer {
         markFailure(reason);
     }
 
-    public void markRefunding(String reason) {
+    public void markRefunding(final String reason) {
         requireStatus(TransferStatus.SENDER_DEBITED, "refund");
         requireReason(reason);
         status = TransferStatus.REFUNDING;
