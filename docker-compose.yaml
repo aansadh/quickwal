@@ -5,7 +5,7 @@ services:
     environment:
       POSTGRES_DB: quickwal
       POSTGRES_USER: quickwal
-      POSTGRES_PASSWORD: quickwalsecret
+      POSTGRES_PASSWORD: "${QUICKWAL_DB_PASSWORD:?Set QUICKWAL_DB_PASSWORD in your local .env file}"
     ports:
       - "5433:5432"
     volumes:

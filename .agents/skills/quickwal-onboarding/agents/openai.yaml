@@ -1,0 +1,4 @@
+interface:
+  display_name: "QuickWal Onboarding"
+  short_description: "Start QuickWal locally and troubleshoot common setup issues."
+  default_prompt: "Use $quickwal-onboarding to set up and run QuickWal locally."

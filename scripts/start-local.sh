@@ -41,6 +41,21 @@ fail_with_startup_log() {
 
 cd "${PROJECT_ROOT}"
 
+# Compose reads .env automatically, but the host JVM also needs the same value.
+# Respect a value already exported by the caller; otherwise load the local .env.
+if [[ -z "${QUICKWAL_DB_PASSWORD:-}" && -f "${PROJECT_ROOT}/.env" ]]; then
+    set -a
+    # shellcheck disable=SC1091
+    source "${PROJECT_ROOT}/.env"
+    set +a
+fi
+
+if [[ -z "${QUICKWAL_DB_PASSWORD:-}" ]]; then
+    printf '%s\n' "QUICKWAL_DB_PASSWORD is required. Copy .env.example to .env and set a local password." >&2
+    exit 1
+fi
+export QUICKWAL_DB_PASSWORD
+
 if ! command -v docker >/dev/null 2>&1; then
     printf '%s\n' "Docker is required to run this local startup script." >&2
     exit 1
@@ -86,6 +101,14 @@ if [[ "${DATABASE_NAME}" != "quickwal" ]]; then
     printf 'Refusing to reset unexpected database: %s\n' "${DATABASE_NAME}" >&2
     exit 1
 fi
+
+printf '%s\n' "Applying the configured password to the local quickwal database role..."
+# Use the local database socket after the database name check. Escape SQL string
+# quotes and send the statement over stdin so the password is not in argv/logs.
+ESCAPED_DB_PASSWORD="${QUICKWAL_DB_PASSWORD//\'/\'\'}"
+printf "ALTER ROLE quickwal WITH PASSWORD '%s';\n" "${ESCAPED_DB_PASSWORD}" | \
+    docker compose -f "${COMPOSE_FILE}" exec -T postgres \
+        psql -X -v ON_ERROR_STOP=1 -U quickwal -d quickwal
 
 printf '%s\n' "Resetting the local quickwal database..."
 docker compose -f "${COMPOSE_FILE}" exec -T postgres \
