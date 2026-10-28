@@ -168,3 +168,7 @@ The [QuickWal requirements and design board](https://excalidraw.com/#json=48Xoo1
 The transfer API stores the initial transfer and debit command together. A scheduled relay publishes pending outbox events to Kafka. Wallet workers process commands and emit outcome events; the transfer worker advances the saga and records any next command, such as a recipient credit or sender refund. Inbox records make event handling idempotent.
 
 For the current implementation, see [the transfer flow diagram](docs/transfer_flow.md) for the detailed request, database, and messaging sequence. The Excalidraw board above provides the broader requirements and decision context. Performance notes and sample benchmark data are available in the [`docs/`](docs/) directory.
+
+## Future scope
+
+- **Outbox publishing:** Replace the current scheduled polling relay with Debezium change data capture (CDC), so committed outbox records are streamed from PostgreSQL to Kafka without the application polling on a schedule. This is a future direction; the current implementation uses `OutboxRelayJob`.
