@@ -1,6 +1,6 @@
 # QuickWal
 
-QuickWal is a small peer-to-peer wallet transfer service built with Java 21 and Spring Boot. It accepts transfer requests over HTTP, records them in PostgreSQL, and processes them asynchronously through Kafka. Each transfer moves through a saga so the sender debit, recipient credit, and any required refund can be tracked as separate steps.
+QuickWal is a peer-to-peer wallet transfer service built with Java 21 and Spring Boot. It accepts transfer requests over HTTP, records them in PostgreSQL, and processes them asynchronously through Kafka. Each transfer moves through a saga so the sender debit, recipient credit, and any required refund can be tracked as separate steps.
 
 > **Project status:** QuickWal is a development project. The seeded wallet data and credentials created from `.env.example` are for local use only; never commit your private `.env` file.
 
