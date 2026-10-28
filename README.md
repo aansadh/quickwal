@@ -161,7 +161,7 @@ Database schema changes are managed by Liquibase and are applied by the applicat
 
 ## Requirements and design decisions
 
-The [QuickWal requirements and design board](https://excalidraw.com/#json=48Xoo1x_DTWzX5pjstTyF,qpr-Vs0440mCoCohvuUycQ) is the companion reference for this README. It contains the requirements diagrams, decision discussions, and other project essentials. Use it to understand the intent behind the product behavior and architecture described here.
+The [QuickWal requirements and design board](https://excalidraw.com/#json=1bEPjcaM3mbJozKg_yahS,U2FrrjXSz9PieKElrP1nKg) is the companion reference for this README. It contains the requirements diagrams, decision discussions, and other project essentials. Use it to understand the intent behind the product behavior and architecture described here.
 
 ## Architecture notes
 
